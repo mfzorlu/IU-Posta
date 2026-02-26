@@ -15,15 +15,45 @@ export const useMessaging = (user, profile, privateKey) => {
     const [channelKey, setChannelKey] = useState(null)
     const [loading, setLoading] = useState(false)
 
-    // Fetch joined channels
+    // 1. Fetch joined channels on login
     useEffect(() => {
         if (!user) return
         fetchChannels()
     }, [user])
 
-    // Realtime subscription for new messages
+    // 2. Persistence: Save active channel to localStorage
     useEffect(() => {
-        if (!activeChannel) return
+        if (activeChannel) {
+            localStorage.setItem('iu_posta_active_channel', JSON.stringify(activeChannel))
+        }
+    }, [activeChannel])
+
+    // 3. Auto-select on mount (after channels loaded)
+    useEffect(() => {
+        if (channels.length > 0 && !activeChannel) {
+            const saved = localStorage.getItem('iu_posta_active_channel')
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved)
+                    const stillExists = channels.find(c => c.id === parsed.id)
+                    if (stillExists) selectChannel(stillExists)
+                } catch (e) {
+                    localStorage.removeItem('iu_posta_active_channel')
+                }
+            }
+        }
+    }, [channels])
+
+    // 4. Trigger message fetch when activeChannel and channelKey are both ready
+    useEffect(() => {
+        if (activeChannel && channelKey) {
+            fetchMessages()
+        }
+    }, [activeChannel, channelKey])
+
+    // 5. Realtime subscription for incoming messages
+    useEffect(() => {
+        if (!activeChannel || !channelKey) return
 
         const channel = supabase
             .channel(`room:${activeChannel.id}`)
@@ -34,12 +64,16 @@ export const useMessaging = (user, profile, privateKey) => {
                 filter: `channel_id=eq.${activeChannel.id}`
             }, async (payload) => {
                 const newMessage = await decryptIncomingMessage(payload.new)
-                setMessages((prev) => [...prev, newMessage])
+                setMessages((prev) => {
+                    // Prevent duplicate messages (realtime might fire for own message)
+                    if (prev.some(m => m.id === newMessage.id)) return prev
+                    return [...prev, newMessage]
+                })
             })
             .subscribe()
 
         return () => {
-            supabase.removeChannel(channel)
+            if (channel) supabase.removeChannel(channel)
         }
     }, [activeChannel, channelKey])
 
@@ -50,6 +84,21 @@ export const useMessaging = (user, profile, privateKey) => {
             .eq('channel_members.user_id', user.id)
 
         if (data) setChannels(data)
+    }
+
+    const fetchMessages = async () => {
+        if (!activeChannel || !channelKey) return
+
+        const { data: msgs } = await supabase
+            .from('messages')
+            .select('*, users:sender_id(display_name)')
+            .eq('channel_id', activeChannel.id)
+            .order('created_at', { ascending: true })
+
+        if (msgs) {
+            const decryptedMessages = await Promise.all(msgs.map(m => decryptIncomingMessage(m, channelKey)))
+            setMessages(decryptedMessages)
+        }
     }
 
     const createChannel = async (name) => {
@@ -113,16 +162,6 @@ export const useMessaging = (user, profile, privateKey) => {
             try {
                 const decryptedKey = await decryptAESKeyWithRSA(data.encrypted_channel_key, privateKey)
                 setChannelKey(decryptedKey)
-
-                // Fetch existing messages
-                const { data: msgs } = await supabase
-                    .from('messages')
-                    .select('*, users:sender_id(display_name)')
-                    .eq('channel_id', channel.id)
-                    .order('created_at', { ascending: true })
-
-                const decryptedMessages = await Promise.all((msgs || []).map(m => decryptIncomingMessage(m, decryptedKey)))
-                setMessages(decryptedMessages)
             } catch (err) {
                 console.error('Failed to decrypt channel key:', err)
             }
