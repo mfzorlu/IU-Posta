@@ -44,12 +44,7 @@ export const useMessaging = (user, profile, privateKey) => {
         }
     }, [channels])
 
-    // 4. Trigger message fetch when activeChannel and channelKey are both ready
-    useEffect(() => {
-        if (activeChannel && channelKey) {
-            fetchMessages()
-        }
-    }, [activeChannel, channelKey])
+    // 4. Trigger message fetch is now handled inside selectChannel explicitly.
 
     // 5. Realtime subscription for incoming messages
     useEffect(() => {
@@ -86,20 +81,7 @@ export const useMessaging = (user, profile, privateKey) => {
         if (data) setChannels(data)
     }
 
-    const fetchMessages = async () => {
-        if (!activeChannel || !channelKey) return
-
-        const { data: msgs } = await supabase
-            .from('messages')
-            .select('*, users:sender_id(display_name)')
-            .eq('channel_id', activeChannel.id)
-            .order('created_at', { ascending: true })
-
-        if (msgs) {
-            const decryptedMessages = await Promise.all(msgs.map(m => decryptIncomingMessage(m, channelKey)))
-            setMessages(decryptedMessages)
-        }
-    }
+    const fetchMessages = null // Removed in favor of explicit fetch in selectChannel
 
     const createChannel = async (name) => {
         setLoading(true)
@@ -162,6 +144,18 @@ export const useMessaging = (user, profile, privateKey) => {
             try {
                 const decryptedKey = await decryptAESKeyWithRSA(data.encrypted_channel_key, privateKey)
                 setChannelKey(decryptedKey)
+
+                // Fetch existing messages immediately
+                const { data: msgs } = await supabase
+                    .from('messages')
+                    .select('*, users:sender_id(display_name)')
+                    .eq('channel_id', channel.id)
+                    .order('created_at', { ascending: true })
+
+                if (msgs) {
+                    const decryptedMessages = await Promise.all(msgs.map(m => decryptIncomingMessage(m, decryptedKey)))
+                    setMessages(decryptedMessages)
+                }
             } catch (err) {
                 console.error('Failed to decrypt channel key:', err)
             }
