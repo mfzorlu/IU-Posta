@@ -91,27 +91,41 @@ export const useMessaging = (user, profile, privateKey) => {
         setMessages([])
         setChannelKey(null)
 
-        // Fetch and Decrypt Channel Key
-        const { data, error } = await supabase
-            .from('channel_keys')
-            .select('encrypted_channel_key')
-            .eq('channel_id', channel.id)
-            .eq('user_id', user.id)
-            .single()
+        const fetchKey = async (retry = true) => {
+            const { data, error, status } = await supabase
+                .from('channel_keys')
+                .select('encrypted_channel_key')
+                .eq('channel_id', channel.id)
+                .eq('user_id', user.id)
+                .maybeSingle()
+
+            if ((!data || error) && retry) {
+                console.warn('Channel key fetch failed, retrying in 500ms...', { error, status })
+                await new Promise(r => setTimeout(r, 500))
+                return fetchKey(false)
+            }
+            return data
+        }
+
+        const data = await fetchKey()
 
         if (data && privateKey) {
-            const decryptedKey = await decryptAESKeyWithRSA(data.encrypted_channel_key, privateKey)
-            setChannelKey(decryptedKey)
+            try {
+                const decryptedKey = await decryptAESKeyWithRSA(data.encrypted_channel_key, privateKey)
+                setChannelKey(decryptedKey)
 
-            // Fetch existing messages
-            const { data: msgs } = await supabase
-                .from('messages')
-                .select('*, users:sender_id(display_name)')
-                .eq('channel_id', channel.id)
-                .order('created_at', { ascending: true })
+                // Fetch existing messages
+                const { data: msgs } = await supabase
+                    .from('messages')
+                    .select('*, users:sender_id(display_name)')
+                    .eq('channel_id', channel.id)
+                    .order('created_at', { ascending: true })
 
-            const decryptedMessages = await Promise.all((msgs || []).map(m => decryptIncomingMessage(m, decryptedKey)))
-            setMessages(decryptedMessages)
+                const decryptedMessages = await Promise.all((msgs || []).map(m => decryptIncomingMessage(m, decryptedKey)))
+                setMessages(decryptedMessages)
+            } catch (err) {
+                console.error('Failed to decrypt channel key:', err)
+            }
         }
     }
 
@@ -159,20 +173,25 @@ export const useMessaging = (user, profile, privateKey) => {
     }
 
     const decryptIncomingMessage = async (msg, key = channelKey) => {
-        if (!key) return { ...msg, content: '[Key Missing]' }
+        if (!key) return { ...msg, content: '[Key Missing]', sender_name: '???' }
 
-        // If msg doesn't have users, fetch it (for realtime)
-        let displayName = msg.users?.display_name
-        if (!displayName) {
-            const { data } = await supabase.from('users').select('display_name').eq('id', msg.sender_id).single()
-            displayName = data?.display_name || 'Unknown'
-        }
+        try {
+            // If msg doesn't have users, fetch it (for realtime)
+            let displayName = msg.users?.display_name || msg.sender_name
+            if (!displayName) {
+                const { data } = await supabase.from('users').select('display_name').eq('id', msg.sender_id).maybeSingle()
+                displayName = data?.display_name || 'Unknown student'
+            }
 
-        const decrypted = await decryptMessage(msg.encrypted_content, msg.iv, key)
-        return {
-            ...msg,
-            content: decrypted,
-            sender_name: displayName
+            const decrypted = await decryptMessage(msg.encrypted_content, msg.iv, key)
+            return {
+                ...msg,
+                content: decrypted,
+                sender_name: displayName
+            }
+        } catch (error) {
+            console.error('Decryption failed for message:', error)
+            return { ...msg, content: '[Decryption Error]', sender_name: '???' }
         }
     }
 
