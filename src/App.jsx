@@ -18,7 +18,7 @@ function App() {
         selectChannel,
         sendMessage,
         leaveChannel
-    } = useMessaging(user, profile, getPrivateKey())
+    } = useMessaging(user, profile, getPrivateKey)
 
     if (authLoading) {
         return (

@@ -8,7 +8,7 @@ import {
     decryptMessage
 } from '../lib/crypto'
 
-export const useMessaging = (user, profile, privateKey) => {
+export const useMessaging = (user, profile, getPrivateKey) => {
     const [channels, setChannels] = useState([])
     const [activeChannel, setActiveChannel] = useState(null)
     const [messages, setMessages] = useState([])
@@ -28,9 +28,9 @@ export const useMessaging = (user, profile, privateKey) => {
         }
     }, [activeChannel])
 
-    // 3. Auto-select on mount (after channels loaded)
+    // 3. Auto-select on mount (after channels and profile are loaded)
     useEffect(() => {
-        if (channels.length > 0 && !activeChannel) {
+        if (channels.length > 0 && !activeChannel && profile) {
             const saved = localStorage.getItem('iu_posta_active_channel')
             if (saved) {
                 try {
@@ -42,7 +42,7 @@ export const useMessaging = (user, profile, privateKey) => {
                 }
             }
         }
-    }, [channels])
+    }, [channels, profile])
 
     // 4. Trigger message fetch is now handled inside selectChannel explicitly.
 
@@ -139,6 +139,7 @@ export const useMessaging = (user, profile, privateKey) => {
         }
 
         const data = await fetchKey()
+        const privateKey = getPrivateKey ? getPrivateKey() : null
 
         if (data && privateKey) {
             try {
