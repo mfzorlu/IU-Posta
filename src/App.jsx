@@ -1,0 +1,63 @@
+import { useAuth } from './hooks/useAuth'
+import { useMessaging } from './hooks/useMessaging'
+import { AuthForm } from './components/AuthForm'
+import { Sidebar } from './components/Sidebar'
+import { ChatWindow } from './components/ChatWindow'
+import { MemberList } from './components/MemberList'
+
+function App() {
+    const { user, profile, loading: authLoading, signIn, signUp, signOut, getPrivateKey } = useAuth()
+    const {
+        channels,
+        activeChannel,
+        messages,
+        channelKey,
+        createChannel,
+        selectChannel,
+        sendMessage
+    } = useMessaging(user, profile, getPrivateKey())
+
+    if (authLoading) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        )
+    }
+
+    if (!user) {
+        return (
+            <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
+                <AuthForm onSignIn={signIn} onSignUp={signUp} />
+            </div>
+        )
+    }
+
+    return (
+        <div className="h-screen w-full bg-slate-950 text-white flex overflow-hidden">
+            <Sidebar
+                channels={channels}
+                activeChannel={activeChannel}
+                onSelectChannel={selectChannel}
+                onCreateChannel={createChannel}
+                onSignOut={signOut}
+                userProfile={profile}
+            />
+
+            <ChatWindow
+                channel={activeChannel}
+                messages={messages}
+                onSendMessage={sendMessage}
+            />
+
+            {activeChannel && (
+                <MemberList
+                    channel={activeChannel}
+                    channelKey={channelKey}
+                />
+            )}
+        </div>
+    )
+}
+
+export default App
