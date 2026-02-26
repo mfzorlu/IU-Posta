@@ -16,7 +16,8 @@ function App() {
         channelKey,
         createChannel,
         selectChannel,
-        sendMessage
+        sendMessage,
+        leaveChannel
     } = useMessaging(user, profile, getPrivateKey())
 
     if (authLoading) {
@@ -46,6 +47,7 @@ function App() {
                 }}
                 onCreateChannel={createChannel}
                 onSignOut={signOut}
+                onLeave={leaveChannel}
                 userProfile={profile}
                 isOpen={showMobileSidebar}
                 onClose={() => setShowMobileSidebar(false)}
@@ -63,6 +65,7 @@ function App() {
                     <MemberList
                         channel={activeChannel}
                         channelKey={channelKey}
+                        onLeave={leaveChannel}
                     />
                 </div>
             )}

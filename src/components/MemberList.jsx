@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
-import { UserPlus, Search, UserCheck, Shield } from 'lucide-react'
+import { UserPlus, Search, UserCheck, Shield, LogOut } from 'lucide-react'
 import { supabase } from '../api/supabase'
 import { encryptAESKeyWithRSA } from '../lib/crypto'
 
-export function MemberList({ channel, channelKey, onMemberAdded }) {
+export function MemberList({ channel, channelKey, onMemberAdded, onLeave }) {
     const [searchEmail, setSearchEmail] = useState('')
     const [searchResults, setSearchResults] = useState([])
     const [members, setMembers] = useState([])
@@ -16,7 +16,7 @@ export function MemberList({ channel, channelKey, onMemberAdded }) {
     const fetchMembers = async () => {
         const { data } = await supabase
             .from('channel_members')
-            .select('user_id, users:user_id(display_name, email)')
+            .select('user_id, users:user_id(id, display_name, email)')
             .eq('channel_id', channel.id)
         if (data) setMembers(data.map(m => m.users))
     }
@@ -124,6 +124,21 @@ export function MemberList({ channel, channelKey, onMemberAdded }) {
                         </div>
                     ))}
                 </div>
+            </div>
+
+            {/* Leave Channel Button */}
+            <div className="p-4 border-t border-slate-800">
+                <button
+                    onClick={() => {
+                        if (window.confirm(`Are you sure you want to leave #${channel.name}?`)) {
+                            onLeave(channel.id)
+                        }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white transition-all text-xs font-semibold border border-red-500/20"
+                >
+                    <LogOut size={14} />
+                    Leave Channel
+                </button>
             </div>
         </div>
     )

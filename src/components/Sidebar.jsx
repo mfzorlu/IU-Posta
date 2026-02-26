@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Hash, Plus, Settings, LogOut, X } from 'lucide-react'
 
-export function Sidebar({ channels, activeChannel, onSelectChannel, onCreateChannel, onSignOut, userProfile, isOpen, onClose }) {
+export function Sidebar({ channels, activeChannel, onSelectChannel, onCreateChannel, onSignOut, onLeave, userProfile, isOpen, onClose }) {
     const [isCreating, setIsCreating] = useState(false)
     const [newChannelName, setNewChannelName] = useState('')
 
@@ -67,17 +67,34 @@ export function Sidebar({ channels, activeChannel, onSelectChannel, onCreateChan
                     )}
 
                     {channels.map((channel) => (
-                        <button
+                        <div
                             key={channel.id}
                             onClick={() => onSelectChannel(channel)}
-                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-all ${activeChannel?.id === channel.id
-                                    ? 'bg-blue-600/20 text-blue-400 font-medium'
-                                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                            className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md transition-all group cursor-pointer ${activeChannel?.id === channel.id
+                                ? 'bg-blue-600/20 text-blue-400 font-medium'
+                                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                                 }`}
                         >
-                            <Hash size={18} />
-                            <span className="truncate">{channel.name}</span>
-                        </button>
+                            <div className="flex items-center gap-2 truncate">
+                                <Hash size={18} />
+                                <span className="truncate">{channel.name}</span>
+                            </div>
+
+                            {activeChannel?.id === channel.id && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        if (window.confirm(`Are you sure you want to leave #${channel.name}?`)) {
+                                            onLeave(channel.id)
+                                        }
+                                    }}
+                                    className="p-1 rounded hover:bg-red-500 hover:text-white text-slate-500 transition-colors md:hidden"
+                                    title="Leave Channel"
+                                >
+                                    <LogOut size={12} />
+                                </button>
+                            )}
+                        </div>
                     ))}
                 </div>
 

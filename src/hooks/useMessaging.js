@@ -130,6 +130,34 @@ export const useMessaging = (user, profile, privateKey) => {
         if (error) throw error
     }
 
+    const leaveChannel = async (channelId) => {
+        try {
+            // 1. Check member count
+            const { data: members } = await supabase
+                .from('channel_members')
+                .select('user_id')
+                .eq('channel_id', channelId)
+
+            const isLastMember = members?.length === 1
+            const isCreator = activeChannel?.created_by === user.id
+
+            // 2. Delete member and keys
+            await supabase.from('channel_members').delete().eq('channel_id', channelId).eq('user_id', user.id)
+            await supabase.from('channel_keys').delete().eq('channel_id', channelId).eq('user_id', user.id)
+
+            // 3. If last member and creator, delete channel
+            if (isLastMember && isCreator) {
+                await supabase.from('channels').delete().eq('id', channelId)
+            }
+
+            setActiveChannel(null)
+            fetchChannels()
+        } catch (error) {
+            console.error('Failed to leave channel:', error)
+            throw error
+        }
+    }
+
     const decryptIncomingMessage = async (msg, key = channelKey) => {
         if (!key) return { ...msg, content: '[Key Missing]' }
 
@@ -156,6 +184,7 @@ export const useMessaging = (user, profile, privateKey) => {
         loading,
         createChannel,
         selectChannel,
-        sendMessage
+        sendMessage,
+        leaveChannel
     }
 }
