@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useAuth } from './hooks/useAuth'
 import { useMessaging } from './hooks/useMessaging'
 import { AuthForm } from './components/AuthForm'
@@ -7,6 +8,7 @@ import { MemberList } from './components/MemberList'
 
 function App() {
     const { user, profile, loading: authLoading, signIn, signUp, signOut, getPrivateKey } = useAuth()
+    const [showMobileSidebar, setShowMobileSidebar] = useState(false)
     const {
         channels,
         activeChannel,
@@ -34,27 +36,35 @@ function App() {
     }
 
     return (
-        <div className="h-screen w-full bg-slate-950 text-white flex overflow-hidden">
+        <div className="h-screen w-full bg-slate-950 text-white flex overflow-hidden relative">
             <Sidebar
                 channels={channels}
                 activeChannel={activeChannel}
-                onSelectChannel={selectChannel}
+                onSelectChannel={(c) => {
+                    selectChannel(c)
+                    setShowMobileSidebar(false)
+                }}
                 onCreateChannel={createChannel}
                 onSignOut={signOut}
                 userProfile={profile}
+                isOpen={showMobileSidebar}
+                onClose={() => setShowMobileSidebar(false)}
             />
 
             <ChatWindow
                 channel={activeChannel}
                 messages={messages}
                 onSendMessage={sendMessage}
+                onToggleSidebar={() => setShowMobileSidebar(!showMobileSidebar)}
             />
 
             {activeChannel && (
-                <MemberList
-                    channel={activeChannel}
-                    channelKey={channelKey}
-                />
+                <div className="hidden lg:block">
+                    <MemberList
+                        channel={activeChannel}
+                        channelKey={channelKey}
+                    />
+                </div>
             )}
         </div>
     )
